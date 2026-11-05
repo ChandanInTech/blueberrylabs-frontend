@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #0b1020;
+  --color-ink-900: #121830;
+  --color-ink-800: #1b2342;
+  --color-ink-700: #2a3556;
+  --color-ink-500: #5b6788;
+  --color-ink-300: #9aa5c4;
+  --color-ink-100: #e6eaf5;
+  --color-berry-600: #4f46e5;
+  --color-berry-500: #6366f1;
+  --color-berry-400: #818cf8;
+  --color-mint-500: #10b981;
+  --color-amber-500: #f59e0b;
+  --color-rose-500: #f43f5e;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-ink-700);
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background:
+      radial-gradient(1100px 600px at 12% -10%, #1f2a52 0%, transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, #2b1f4d 0%, transparent 55%),
+      var(--color-ink-950);
+    color: var(--color-ink-100);
+    font-family: var(--font-sans);
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--color-berry-500);
+    color: white;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-berry-400);
+    outline-offset: 2px;
+  }
+}
+
+@utility surface {
+  background: color-mix(in oklab, var(--color-ink-900) 88%, transparent);
+  border: 1px solid var(--color-ink-800);
+  border-radius: 1rem;
+  backdrop-filter: blur(12px);
+}
+
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-ink-800) 0%,
+    var(--color-ink-700) 40%,
+    var(--color-ink-800) 80%
+  );
+  background-size: 400px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+.indeterminate-bar::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  width: 25%;
+  background: linear-gradient(90deg, transparent, var(--color-berry-400), transparent);
+  animation: indeterminate 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

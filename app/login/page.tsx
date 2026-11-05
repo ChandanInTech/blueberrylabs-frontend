@@ -46,8 +46,8 @@ export default function LoginPage() {
         </div>
 
         <p className="mb-6 text-sm leading-relaxed text-ink-300">
-          Enter the access code you were given. It signs you in for 24 hours — after that you will need a new
-          code.
+          Enter your access code. It is your permanent login — the same code works every time. Each sign-in
+          lasts 24 hours, after which you enter the same code again.
         </p>
 
         {error ? (
@@ -93,7 +93,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-5 text-center text-xs text-ink-500">
-          Demo mode: access codes are issued by the operator, not self-service.
+          Demo mode: access codes are issued by the operator, not self-service.{" "}
         </p>
       </div>
     </div>

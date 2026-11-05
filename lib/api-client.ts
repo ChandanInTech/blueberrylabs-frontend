@@ -19,8 +19,23 @@ export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://loc
   "",
 );
 
-/** CSRF cookie set by the API. Readable by design (double-submit pattern). */
+/** CSRF cookie name, used only when the API shares this origin. */
 const CSRF_COOKIE = "bl_csrf";
+
+/**
+ * In-memory CSRF token.
+ *
+ * The API sets `bl_csrf` on its own origin. When the frontend and API are on
+ * different registrable domains (Vercel calling Railway), that cookie belongs
+ * to the API's origin and `document.cookie` here can never see it. The token is
+ * therefore taken from the API response body and kept in memory, which also
+ * avoids persisting it to storage.
+ */
+let csrfToken: string | null = null;
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+}
 
 export class ApiError extends Error {
   readonly code: ErrorCode;
@@ -58,7 +73,15 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Resolve the CSRF token.
+ *
+ * Prefers the in-memory value captured from the API response. Falls back to the
+ * cookie, which is what works when the API is same-origin (local development
+ * through a proxy, or a shared custom domain).
+ */
 export function readCsrfToken(): string | null {
+  if (csrfToken) return csrfToken;
   if (typeof document === "undefined") return null;
   const match = document.cookie
     .split(";")
@@ -147,15 +170,27 @@ function toApiError(response: Response, payload: unknown): ApiError {
 export const api = {
   // ---- auth ---------------------------------------------------------------
   async createDemoSession(signal?: AbortSignal): Promise<DemoSession> {
-    return request<DemoSession>("/api/v1/auth/demo", { method: "POST", csrf: false, signal });
+    const session = await request<DemoSession>("/api/v1/auth/demo", {
+      method: "POST",
+      csrf: false,
+      signal,
+    });
+    setCsrfToken(session.csrfToken);
+    return session;
   },
 
   async getSession(signal?: AbortSignal): Promise<DemoSession> {
-    return request<DemoSession>("/api/v1/auth/session", { signal });
+    const session = await request<DemoSession>("/api/v1/auth/session", { signal });
+    setCsrfToken(session.csrfToken);
+    return session;
   },
 
   async logout(): Promise<void> {
-    await request<void>("/api/v1/auth/logout", { method: "POST" });
+    try {
+      await request<void>("/api/v1/auth/logout", { method: "POST" });
+    } finally {
+      setCsrfToken(null);
+    }
   },
 
   // ---- uploads ------------------------------------------------------------

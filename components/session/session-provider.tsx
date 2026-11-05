@@ -1,16 +1,17 @@
 "use client";
 
-import type { DemoSession } from "@social-resizer/contracts";
+import type { AuthSession } from "@social-resizer/contracts";
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { endSession, loadSession, startDemoSession } from "@/lib/auth";
+import { endSession, loadSession, login } from "@/lib/auth";
 
 type SessionStatus = "loading" | "authenticated" | "anonymous";
 
 interface SessionContextValue {
   status: SessionStatus;
-  session: DemoSession | null;
-  signIn: () => Promise<void>;
+  session: AuthSession | null;
+  /** Exchange an access code for a token. */
+  signIn: (code: string) => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
 }
@@ -18,14 +19,15 @@ interface SessionContextValue {
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 /**
- * Demo session state for the whole app.
+ * Session state for the whole app.
  *
- * The API holds the authority (HttpOnly cookie); this provider only mirrors
- * "who does the server say I am" so the UI can avoid a flash of content.
+ * The API holds the authority (it verifies the token on every request); this
+ * provider mirrors "who does the server say I am" so the UI can avoid a flash
+ * of content and route the user to the login screen when the token is gone.
  */
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<SessionStatus>("loading");
-  const [session, setSession] = useState<DemoSession | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -46,18 +48,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return () => controller.abort();
   }, []);
 
-  const signIn = useCallback(async () => {
-    setError(null);
-    try {
-      const created = await startDemoSession();
-      setSession(created);
-      setStatus("authenticated");
-      router.replace("/");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "We could not start the demo session.");
-      throw cause;
-    }
-  }, [router]);
+  const signIn = useCallback(
+    async (code: string) => {
+      setError(null);
+      try {
+        const created = await login(code);
+        setSession(created);
+        setStatus("authenticated");
+        router.replace("/");
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "That access code could not be used.");
+        throw cause;
+      }
+    },
+    [router],
+  );
 
   const signOut = useCallback(async () => {
     await endSession();

@@ -1,12 +1,12 @@
 import {
   type ApiErrorBody,
   type AssetMetadata,
+  type AuthSession,
   type CompleteUploadResponse,
   type CreateGenerationRequest,
   type CreateGenerationResponse,
   type CreateUploadRequest,
   type CreateUploadResponse,
-  type DemoSession,
   type ErrorCode,
   type GenerationListResponse,
   type GenerationStatusResponse,
@@ -19,22 +19,38 @@ export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://loc
   "",
 );
 
-/** CSRF cookie name, used only when the API shares this origin. */
-const CSRF_COOKIE = "bl_csrf";
+/** Where the JWT is kept between page loads. */
+const TOKEN_STORAGE_KEY = "bl_token";
 
 /**
- * In-memory CSRF token.
+ * Read the stored token.
  *
- * The API sets `bl_csrf` on its own origin. When the frontend and API are on
- * different registrable domains (Vercel calling Railway), that cookie belongs
- * to the API's origin and `document.cookie` here can never see it. The token is
- * therefore taken from the API response body and kept in memory, which also
- * avoids persisting it to storage.
+ * `localStorage` (not a cookie) because the token is sent as an
+ * `Authorization` header, never automatically by the browser. That is what
+ * makes CSRF a non-issue: a cross-site request cannot attach this header.
+ *
+ * Tradeoff: `localStorage` is readable by any script on this origin, so an XSS
+ * bug could exfiltrate the token. The mitigations are a short 24h expiry,
+ * server-side revocation on logout, and no third-party scripts.
  */
-let csrfToken: string | null = null;
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // Storage can throw in private mode or when disabled by policy.
+    return null;
+  }
+}
 
-export function setCsrfToken(token: string | null): void {
-  csrfToken = token;
+export function setToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // Ignore: the in-memory session still works for this page load.
+  }
 }
 
 export class ApiError extends Error {
@@ -74,20 +90,13 @@ export class ApiError extends Error {
 }
 
 /**
- * Resolve the CSRF token.
+ * Resolve the bearer token for a request.
  *
- * Prefers the in-memory value captured from the API response. Falls back to the
- * cookie, which is what works when the API is same-origin (local development
- * through a proxy, or a shared custom domain).
+ * Kept as a named export so tests can assert the header wiring without a
+ * browser.
  */
-export function readCsrfToken(): string | null {
-  if (csrfToken) return csrfToken;
-  if (typeof document === "undefined") return null;
-  const match = document.cookie
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${CSRF_COOKIE}=`));
-  return match ? decodeURIComponent(match.slice(CSRF_COOKIE.length + 1)) : null;
+export function readAuthToken(): string | null {
+  return getToken();
 }
 
 interface RequestOptions {
@@ -95,26 +104,26 @@ interface RequestOptions {
   body?: unknown;
   /** Extra headers, e.g. Idempotency-Key. */
   headers?: Record<string, string>;
-  /** Attach the CSRF header (required for unsafe methods). */
-  csrf?: boolean;
+  /** Send the stored token. Defaults to on; only `/auth/login` opts out. */
+  auth?: boolean;
   signal?: AbortSignal;
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, headers = {}, csrf = method !== "GET", signal } = options;
+  const { method = "GET", body, headers = {}, auth = true, signal } = options;
 
   const requestHeaders: Record<string, string> = { Accept: "application/json", ...headers };
   if (body !== undefined) requestHeaders["Content-Type"] = "application/json";
-  if (csrf) {
-    const token = readCsrfToken();
-    if (token) requestHeaders["X-CSRF-Token"] = token;
+
+  if (auth) {
+    const token = readAuthToken();
+    if (token) requestHeaders.Authorization = `Bearer ${token}`;
   }
 
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
-      credentials: "include",
       headers: requestHeaders,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
@@ -169,19 +178,23 @@ function toApiError(response: Response, payload: unknown): ApiError {
 
 export const api = {
   // ---- auth ---------------------------------------------------------------
-  async createDemoSession(signal?: AbortSignal): Promise<DemoSession> {
-    const session = await request<DemoSession>("/api/v1/auth/demo", {
+  /** Exchange an access code for a JWT and persist it. */
+  async login(code: string, signal?: AbortSignal): Promise<AuthSession> {
+    const session = await request<AuthSession>("/api/v1/auth/login", {
       method: "POST",
-      csrf: false,
+      body: { code },
+      auth: false,
       signal,
     });
-    setCsrfToken(session.csrfToken);
+    setToken(session.token);
     return session;
   },
 
-  async getSession(signal?: AbortSignal): Promise<DemoSession> {
-    const session = await request<DemoSession>("/api/v1/auth/session", { signal });
-    setCsrfToken(session.csrfToken);
+  async getSession(signal?: AbortSignal): Promise<AuthSession> {
+    const session = await request<AuthSession>("/api/v1/auth/session", { signal });
+    // The server echoes the caller's own token; keep storage in sync in case it
+    // was cleared while the request was in flight.
+    if (session.token) setToken(session.token);
     return session;
   },
 
@@ -189,7 +202,8 @@ export const api = {
     try {
       await request<void>("/api/v1/auth/logout", { method: "POST" });
     } finally {
-      setCsrfToken(null);
+      // Clear locally even if the server call failed: the user asked to leave.
+      setToken(null);
     }
   },
 

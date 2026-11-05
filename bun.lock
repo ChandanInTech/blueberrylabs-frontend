@@ -131,7 +131,7 @@
 
     "@next/swc-win32-x64-msvc": ["@next/swc-win32-x64-msvc@16.4.5", "", { "os": "win32", "cpu": "x64" }, "sha512-qNZj66pYXnaWLiF9R9GUbfBdrCv7kC6TaZfIwB2KH5WPc/8pEM3nVOj8hpQhWJU8S94rlH5MPDcX15+RrgUhiw=="],
 
-    "@social-resizer/contracts": ["@social-resizer/contracts@./vendor/social-resizer-contracts-1.0.0.tgz", {}, "sha512-S4/AGbmo6zPTnmMUhboG77U0VX7ZjrNiIWaq92yaqCuNC1IRjcOosw1CFOrZfvwIG9DCJXWR3+LFiszxGJLMqg=="],
+    "@social-resizer/contracts": ["@social-resizer/contracts@./vendor/social-resizer-contracts-1.0.0.tgz", {}, "sha512-yLM36llJLgywne3mhURO+CezdbjxfKIcaNPhPrsLK6FYURHK7GFeZcK5zg1D/YTwUH6SquvmBZ9bvhiyncihWw=="],
 
     "@swc/helpers": ["@swc/helpers@0.5.23", "", { "dependencies": { "tslib": "^2.8.0" } }, "sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw=="],
 

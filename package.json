@@ -12,7 +12,7 @@
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
-    "@social-resizer/contracts": "file:./vendor/social-resizer-contracts-1.0.0.tgz",
+    "@social-resizer/contracts": "file:./vendor/social-resizer-contracts-1.1.0.tgz",
     "next": "^16.4.5",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

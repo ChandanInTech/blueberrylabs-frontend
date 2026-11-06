@@ -66,6 +66,8 @@ before use, and the presets are re-validated by the backend on every request.
 
 ## Session handling
 
-The session cookie is `HttpOnly` — this app can never read or forge it. `lib/auth.ts`
-only asks the API who the cookie belongs to. State-changing requests send the
-`X-CSRF-Token` header read from the readable `bl_csrf` cookie (double-submit pattern).
+The credential is a bearer JWT stored in `localStorage` (`lib/auth.ts` asks the
+API who the token belongs to on reload). Every request sends it as an
+`Authorization: Bearer` header, which the browser never attaches on its own —
+that is what makes CSRF a non-issue, so there is no CSRF token. Logout revokes
+the session server-side, so the token stops working immediately.
